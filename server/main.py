@@ -12,6 +12,7 @@ from pathlib import Path
 from .models.client import ClientData
 from .handlers.file_manager import FileManagerHandler
 
+# Make app available for import
 app = FastAPI(title="Zerotracex")
 file_manager = FileManagerHandler()
 
