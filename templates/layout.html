@@ -237,12 +237,12 @@
 
         .file-list tr {
             cursor: pointer;
-            height: 48px;
+            height: 50px;
         }
 
         .file-list td {
             padding: 8px 16px;
-            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
         }
 
         .file-list tr:hover {
@@ -253,6 +253,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            padding: 4px 0;
         }
 
         .file-icon {
@@ -262,6 +263,7 @@
             align-items: center;
             justify-content: center;
             border-radius: 4px;
+            flex-shrink: 0;
         }
 
         .file-icon.pdf {
@@ -310,48 +312,6 @@
             width: 120px;
         }
 
-        .actions-menu {
-            opacity: 0;
-            width: 32px;
-            display: flex;
-            justify-content: center;
-        }
-
-        tr:hover .actions-menu {
-            opacity: 1;
-        }
-
-        .checkbox {
-            width: 18px;
-            height: 18px;
-            border: 1.5px solid var(--border-color);
-            border-radius: 4px;
-            margin-right: 8px;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar, .file-owner, .file-date, .actions-menu {
-                display: none;
-            }
-        }
-
-        .refresh-button {
-            padding: 8px 16px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .refresh-button:hover {
-            opacity: 0.9;
-        }
-
         .download-link {
             color: var(--text-secondary);
             text-decoration: none;
@@ -366,13 +326,27 @@
             color: var(--primary-color);
         }
 
+        .actions-menu {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 80px;
+            padding: 0 4px;
+        }
+
         .action-button {
             color: var(--text-secondary);
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 8px;
+            border-radius: 6px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            background: transparent;
+            width: 36px;
+            height: 36px;
         }
 
         .action-button:hover {
@@ -380,13 +354,41 @@
             color: var(--primary-color);
         }
 
-        .actions-menu {
-            opacity: 0;
-            transition: opacity 0.2s;
+        .refresh-button {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
         }
 
-        tr:hover .actions-menu {
+        .refresh-button:hover {
+            opacity: 0.9;
+        }
+
+        .file-list tr:hover .action-button {
             opacity: 1;
+            visibility: visible;
+        }
+
+        .action-button[title]:hover:after {
+            content: attr(title);
+            position: absolute;
+            background: var(--text-primary);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-top: -32px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 1000;
         }
 
         .warning-dialog {
@@ -458,8 +460,94 @@
         .warning-dialog .confirm:hover {
             opacity: 0.9;
         }
+
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+
+        .checkbox:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-color);
+        }
+
+        .checkbox.checked {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .checkbox.checked i {
+            font-size: 12px;
+        }
+
+        .batch-actions {
+            position: fixed;
+            bottom: 0;
+            left: 280px;
+            right: 0;
+            background: white;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+
+        .batch-actions.visible {
+            display: flex;
+        }
+
+        .batch-actions .selected-count {
+            color: var(--text-secondary);
+        }
+
+        .batch-actions .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .batch-button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .batch-button.primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .batch-button.secondary {
+            background: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        .batch-button:hover {
+            opacity: 0.9;
+        }
     </style>
     <script>
+        const FILE_SIZE_LIMIT = 100 * 1024 * 1024; // 100MB
+        const TOTAL_SIZE_LIMIT = 500 * 1024 * 1024; // 500MB for ZIP
+
         function refreshDirectory() {
             window.location.reload();
         }
@@ -504,6 +592,385 @@
             if (size < 1024 * 1024 * 1024) return (size / (1024 * 1024)).toFixed(1) + ' MB';
             return (size / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
         }
+
+        async function saveFile(path) {
+            // Get file size from the checkbox data attribute
+            const checkbox = document.querySelector(`.checkbox[onclick*="${path}"]`);
+            const size = parseInt(checkbox.dataset.size);
+
+            if (size > FILE_SIZE_LIMIT) {
+                const sizeInMB = (size / (1024 * 1024)).toFixed(2);
+                
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large File Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            This file is ${sizeInMB}MB in size, which exceeds the recommended limit of 100MB.
+                            <br><br>
+                            Do you want to proceed with saving?
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithSingleSave('${path}', this)">Save Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+
+            await proceedWithSingleSave(path);
+        }
+
+        async function proceedWithSingleSave(path, element) {
+            if (element) {
+                element.closest('.warning-dialog').remove();
+            }
+
+            try {
+                const response = await fetch(`/save?path=${encodeURIComponent(path)}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('File saved successfully');
+                } else {
+                    alert('Error saving file');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Error saving file');
+            }
+        }
+
+        let selectedFiles = new Set();
+        let fileSizes = new Map();
+
+        function toggleSelect(checkbox, path, size) {
+            const checkIcon = checkbox.querySelector('i');
+            checkbox.classList.toggle('checked');
+            
+            if (checkbox.classList.contains('checked')) {
+                checkIcon.style.display = 'block';
+                selectedFiles.add(path);
+                fileSizes.set(path, parseInt(size));
+            } else {
+                checkIcon.style.display = 'none';
+                selectedFiles.delete(path);
+                fileSizes.delete(path);
+            }
+            updateBatchActions();
+        }
+
+        function updateBatchActions() {
+            const batchActions = document.querySelector('.batch-actions');
+            const selectedCount = document.querySelector('.selected-count');
+            
+            if (selectedFiles.size > 0) {
+                batchActions.classList.add('visible');
+                selectedCount.textContent = `${selectedFiles.size} item${selectedFiles.size === 1 ? '' : 's'} selected`;
+            } else {
+                batchActions.classList.remove('visible');
+            }
+        }
+
+        function deselectAll() {
+            document.querySelectorAll('.checkbox.checked').forEach(checkbox => {
+                checkbox.classList.remove('checked');
+                checkbox.querySelector('i').style.display = 'none';
+            });
+            selectedFiles.clear();
+            fileSizes.clear();
+            updateBatchActions();
+        }
+
+        function getTotalSelectedSize() {
+            let total = 0;
+            for (const path of selectedFiles) {
+                total += fileSizes.get(path) || 0;
+            }
+            return total;
+        }
+
+        async function downloadSelected() {
+            const totalSize = getTotalSelectedSize();
+            if (totalSize > TOTAL_SIZE_LIMIT) {
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+                const limitMB = (TOTAL_SIZE_LIMIT / (1024 * 1024)).toFixed(0);
+                
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large Download Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            Total size of selected files is ${totalSizeMB}MB. This exceeds the recommended limit of ${limitMB}MB.
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithDownload(this)">Download Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+            
+            await proceedWithDownload();
+        }
+
+        async function proceedWithDownload(element) {
+            if (element) {
+                element.closest('.warning-dialog').remove();
+            }
+            
+            for (const path of selectedFiles) {
+                const size = fileSizes.get(path);
+                if (size > FILE_SIZE_LIMIT) {
+                    const modal = document.createElement('div');
+                    modal.className = 'warning-dialog';
+                    modal.innerHTML = `
+                        <div class="warning-content">
+                            <div class="warning-header">
+                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                                <span>Large File Download</span>
+                            </div>
+                            <div class="warning-body">
+                                This file is ${(size / (1024 * 1024)).toFixed(2)}MB in size. Continue?
+                            </div>
+                            <div class="buttons">
+                                <button class="cancel" onclick="skipDownload(this)">Skip</button>
+                                <button class="confirm" onclick="confirmBatchDownload(this, '${path}')">Download</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Small delay between dialogs
+                } else {
+                    window.open(`/download?path=${encodeURIComponent(path)}`, '_blank');
+                }
+            }
+            deselectAll();
+        }
+
+        function skipDownload(element) {
+            element.closest('.warning-dialog').remove();
+        }
+
+        function confirmBatchDownload(element, path) {
+            window.open(`/download?path=${encodeURIComponent(path)}`, '_blank');
+            element.closest('.warning-dialog').remove();
+        }
+
+        async function saveSelected() {
+            // Check if any individual file exceeds limit
+            let hasLargeFiles = false;
+            let largeFiles = [];
+            
+            for (const path of selectedFiles) {
+                const size = fileSizes.get(path);
+                if (size > FILE_SIZE_LIMIT) {
+                    hasLargeFiles = true;
+                    largeFiles.push({
+                        name: path.split('/').pop(),
+                        size: (size / (1024 * 1024)).toFixed(2)
+                    });
+                }
+            }
+
+            if (hasLargeFiles) {
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large Files Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            The following files exceed the 100MB limit:<br><br>
+                            ${largeFiles.map(f => `${f.name} (${f.size}MB)`).join('<br>')}
+                            <br><br>
+                            Please select files smaller than 100MB.
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithSave(this)">Save Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+
+            const totalSize = getTotalSelectedSize();
+            if (totalSize > TOTAL_SIZE_LIMIT) {
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+                const limitMB = (TOTAL_SIZE_LIMIT / (1024 * 1024)).toFixed(0);
+                
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large Batch Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            Total size of selected files is ${totalSizeMB}MB. This exceeds the batch limit of ${limitMB}MB.
+                            <br><br>
+                            Please select fewer files to stay under the ${limitMB}MB limit.
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithSave(this)">Save Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+            
+            await proceedWithSave();
+        }
+
+        async function proceedWithSave(element) {
+            if (element) {
+                element.closest('.warning-dialog').remove();
+            }
+            
+            const total = selectedFiles.size;
+            let saved = 0;
+            
+            for (const path of selectedFiles) {
+                try {
+                    const response = await fetch(`/save?path=${encodeURIComponent(path)}`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) saved++;
+                } catch (error) {
+                    console.error('Save error:', error);
+                }
+            }
+            
+            alert(`Successfully saved ${saved} of ${total} files to server`);
+            deselectAll();
+        }
+
+        async function downloadSelectedAsZip() {
+            // Check if any individual file exceeds limit
+            let hasLargeFiles = false;
+            let largeFiles = [];
+            
+            for (const path of selectedFiles) {
+                const size = fileSizes.get(path);
+                if (size > FILE_SIZE_LIMIT) {
+                    hasLargeFiles = true;
+                    largeFiles.push({
+                        name: path.split('/').pop(),
+                        size: (size / (1024 * 1024)).toFixed(2)
+                    });
+                }
+            }
+
+            if (hasLargeFiles) {
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large Files Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            The following files exceed the 100MB limit:<br><br>
+                            ${largeFiles.map(f => `${f.name} (${f.size}MB)`).join('<br>')}
+                            <br><br>
+                            Please select files smaller than 100MB.
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithZip(this)">Download Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+
+            const totalSize = getTotalSelectedSize();
+            if (totalSize > TOTAL_SIZE_LIMIT) {
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+                const limitMB = (TOTAL_SIZE_LIMIT / (1024 * 1024)).toFixed(0);
+                
+                const modal = document.createElement('div');
+                modal.className = 'warning-dialog';
+                modal.innerHTML = `
+                    <div class="warning-content">
+                        <div class="warning-header">
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; margin-right: 10px;"></i>
+                            <span>Large ZIP Warning</span>
+                        </div>
+                        <div class="warning-body">
+                            Total size of selected files is ${totalSizeMB}MB. This exceeds the ZIP limit of ${limitMB}MB.
+                            <br><br>
+                            Please select fewer files to stay under the ${limitMB}MB limit.
+                        </div>
+                        <div class="buttons">
+                            <button class="cancel" onclick="closeWarningDialog(this)">Cancel</button>
+                            <button class="confirm" onclick="proceedWithZip(this)">Download Anyway</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                return;
+            }
+            
+            await proceedWithZip();
+        }
+
+        async function proceedWithZip(element) {
+            if (element) {
+                element.closest('.warning-dialog').remove();
+            }
+            
+            try {
+                const paths = Array.from(selectedFiles);
+                const response = await fetch('/download-zip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ paths })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'selected_files.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    deselectAll();
+                } else {
+                    alert('Error downloading files as ZIP');
+                }
+            } catch (error) {
+                console.error('ZIP download error:', error);
+                alert('Error downloading files as ZIP');
+            }
+        }
     </script>
 </head>
 <body>
@@ -517,13 +984,13 @@
 
         <div class="menu-section">
             <div class="menu-title">Menu</div>
-            <a href="/" class="menu-item active">
+            <a href="/" class="menu-item {active_all}">
                 <i class="fas fa-folder"></i>
                 All files
             </a>
-            <a href="#" class="menu-item">
-                <i class="fas fa-clock"></i>
-                Recent files
+            <a href="/?path=saved" class="menu-item {active_saved}">
+                <i class="fas fa-save"></i>
+                Saved files
             </a>
         </div>
 
@@ -535,6 +1002,24 @@
 
     <div class="main-content">
         {content}
+    </div>
+
+    <div class="batch-actions">
+        <div class="selected-count">0 items selected</div>
+        <div class="actions">
+            <button class="batch-button secondary" onclick="deselectAll()">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button class="batch-button primary" onclick="downloadSelected()">
+                <i class="fas fa-download"></i> Download
+            </button>
+            <button class="batch-button primary" onclick="downloadSelectedAsZip()">
+                <i class="fas fa-file-archive"></i> Download as ZIP
+            </button>
+            <button class="batch-button primary" onclick="saveSelected()">
+                <i class="fas fa-save"></i> Save to Server
+            </button>
+        </div>
     </div>
 </body>
 </html> 

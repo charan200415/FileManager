@@ -1,7 +1,7 @@
 <tr>
     <td style="width: 100%">
         <div class="file-item">
-            <div class="checkbox"></div>
+            {checkbox}
             <div class="file-icon {file_type}">
                 {icon}
             </div>
@@ -9,7 +9,6 @@
                 {entry_name}
                 <div class="file-meta">
                     Uploaded {modified_time}
-                    {download_link}
                 </div>
             </div>
         </div>
@@ -17,5 +16,6 @@
     <td class="file-size">{size}</td>
     <td class="actions-menu">
         {action_buttons}
+        {save_button}
     </td>
 </tr> 

